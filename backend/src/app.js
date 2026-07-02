@@ -10,6 +10,10 @@ import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import dockerHostRoutes from "./routes/dockerHost.routes.js";
+import imageRoutes from "./routes/image.routes.js";
+import volumeRoutes from "./routes/volume.routes.js";
+import networkRoutes from "./routes/network.routes.js";
+import swarmRoutes from "./routes/swarm.routes.js";
 dotenv.config();
 
 const app = express();
@@ -20,6 +24,7 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 
 // Root Route
@@ -57,7 +62,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/docker-hosts", dockerHostRoutes);
-
+app.use("/api/images", imageRoutes);
+app.use("/api/volumes", volumeRoutes);
+app.use("/api/networks", networkRoutes);
+app.use("/api/swarm", swarmRoutes);
 // 404 Route
 app.use((req, res) => {
   res.status(404).json({
