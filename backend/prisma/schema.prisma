@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum HostStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum ContainerStatus {
+  RUNNING
+  STOPPED
+  PAUSED
+}
+
+enum ExperimentType {
+  CPU
+  MEMORY
+  DISK
+  NETWORK
+}
+
+enum ExperimentStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      UserRole  @default(USER)
+
+  projects  Project[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  environment String   @default("Development")
+
+  ownerId String
+  owner   User @relation(fields: [ownerId], references: [id])
+
+  dockerHosts DockerHost[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DockerHost {
+  id          String   @id @default(uuid())
+  name        String
+  host        String
+  port        Int
+  description String?
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  containers  Container[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Container {
+  id          String          @id @default(uuid())
+  dockerId    String
+  name        String
+  image       String
+  status      ContainerStatus
+
+  hostId      String
+  host         DockerHost      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  experiments Experiment[]
+
+  createdAt   DateTime        @default(now())
+}
+
+model Experiment {
+  id           String              @id @default(uuid())
+
+  type         ExperimentType
+
+  status       ExperimentStatus
+
+  duration     Int
+
+  startedAt    DateTime
+
+  endedAt      DateTime?
+
+  containerId  String
+
+  container    Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+}
