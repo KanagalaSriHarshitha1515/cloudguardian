@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-
+import containerRoutes from "./routes/container.routes.js";
 import prisma from "./config/prisma.js";
 import apiRoutes from "./routes/index.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -14,6 +14,8 @@ import imageRoutes from "./routes/image.routes.js";
 import volumeRoutes from "./routes/volume.routes.js";
 import networkRoutes from "./routes/network.routes.js";
 import swarmRoutes from "./routes/swarm.routes.js";
+import serviceRoutes from "./routes/service.routes.js";
+import stackRoutes from "./routes/stack.routes.js";
 dotenv.config();
 
 const app = express();
@@ -62,10 +64,14 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/docker-hosts", dockerHostRoutes);
+app.use("/api/containers", containerRoutes);
 app.use("/api/images", imageRoutes);
 app.use("/api/volumes", volumeRoutes);
 app.use("/api/networks", networkRoutes);
 app.use("/api/swarm", swarmRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/stacks", stackRoutes);
+
 // 404 Route
 app.use((req, res) => {
   res.status(404).json({

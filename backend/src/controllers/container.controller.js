@@ -87,13 +87,14 @@ export const startContainer = async (req, res) => {
     });
 
   } catch (error) {
+  console.error(error);
 
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
+  res.status(500).json({
+    success: false,
+    message: error.message,
+    stack: error.stack,
+  });
+}
 };
 
 export const stopContainer = async (req, res) => {
@@ -307,34 +308,31 @@ export const getContainerStats = async (req, res) => {
 
     // CPU %
 const cpuDelta =
-  stats.cpu_stats.cpu_usage.total_usage -
-  stats.precpu_stats.cpu_usage.total_usage;
+  (stats.cpu_stats?.cpu_usage?.total_usage || 0) -
+  (stats.precpu_stats?.cpu_usage?.total_usage || 0);
 
 const systemDelta =
-  stats.cpu_stats.system_cpu_usage -
-  stats.precpu_stats.system_cpu_usage;
+  (stats.cpu_stats?.system_cpu_usage || 0) -
+  (stats.precpu_stats?.system_cpu_usage || 0);
 
 const cpuPercent =
   systemDelta > 0
     ? (
         (cpuDelta / systemDelta) *
-        stats.cpu_stats.online_cpus *
+        (stats.cpu_stats?.online_cpus || 1) *
         100
       ).toFixed(2)
-    : 0;
+    : "0.00";
+
 
 // Memory
-const memoryUsage = (
-  stats.memory_stats.usage /
-  1024 /
-  1024
-).toFixed(2);
+const memoryUsage = stats.memory_stats?.usage
+  ? (stats.memory_stats.usage / 1024 / 1024).toFixed(2)
+  : "0.00";
 
-const memoryLimit = (
-  stats.memory_stats.limit /
-  1024 /
-  1024
-).toFixed(2);
+const memoryLimit = stats.memory_stats?.limit
+  ? (stats.memory_stats.limit / 1024 / 1024).toFixed(2)
+  : "0.00";
 
 // Network
 let rx = 0;
@@ -357,10 +355,9 @@ res.json({
     memoryLimit: `${memoryLimit} MB`,
     networkRx: `${(rx / 1024 / 1024).toFixed(2)} MB`,
     networkTx: `${(tx / 1024 / 1024).toFixed(2)} MB`,
-    pids: stats.pids_stats.current,
+    pids: stats.pids_stats?.current || 0,
   },
 });
-
   } catch (error) {
 
     res.status(500).json({

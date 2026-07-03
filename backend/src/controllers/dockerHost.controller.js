@@ -45,7 +45,34 @@ export const createDockerHost = async (req, res) => {
 
   }
 };
+export const getDockerHosts = async (req, res) => {
+  try {
+    const dockerHosts = await prisma.dockerHost.findMany({
+      where: {
+        project: {
+          ownerId: req.user.id,
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
+    res.json({
+      success: true,
+      count: dockerHosts.length,
+      dockerHosts,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
 export const testDockerConnection = async (req, res) => {
   try {
     const { id } = req.params;
