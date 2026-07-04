@@ -1,172 +1,127 @@
 import prisma from "../config/prisma.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
 
-export const createProject = async (req, res) => {
-  try {
-    const { name, description, environment } = req.body;
+// Create Project
+export const createProject = asyncHandler(async (req, res) => {
+  const { name, description, environment } = req.body;
 
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "Project name is required",
-      });
-    }
-
-    const project = await prisma.project.create({
-      data: {
-        name,
-        description,
-        environment,
-        ownerId: req.user.id,
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Project created successfully",
-      project,
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  if (!name) {
+    throw new ApiError(400, "Project name is required");
   }
-};
-export const getProjects = async (req, res) => {
-  try {
-    const projects = await prisma.project.findMany({
-      where: {
-        ownerId: req.user.id,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
 
-    res.json({
-      success: true,
-      count: projects.length,
-      projects,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  const project = await prisma.project.create({
+    data: {
+      name,
+      description,
+      environment,
+      ownerId: req.user.id,
+    },
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Project created successfully",
+    project,
+  });
+});
+
+// Get All Projects
+export const getProjects = asyncHandler(async (req, res) => {
+  const projects = await prisma.project.findMany({
+    where: {
+      ownerId: req.user.id,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  res.json({
+    success: true,
+    count: projects.length,
+    projects,
+  });
+});
+
+// Get Project By ID
+export const getProjectById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      ownerId: req.user.id,
+    },
+  });
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
-export const getProjectById = async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        ownerId: req.user.id,
-      },
-    });
+  res.json({
+    success: true,
+    project,
+  });
+});
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+// Update Project
+export const updateProject = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, description, environment } = req.body;
 
-    res.json({
-      success: true,
-      project,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      ownerId: req.user.id,
+    },
+  });
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
-export const updateProject = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, description, environment } = req.body;
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        ownerId: req.user.id,
-      },
-    });
+  const updatedProject = await prisma.project.update({
+    where: {
+      id,
+    },
+    data: {
+      name,
+      description,
+      environment,
+    },
+  });
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+  res.json({
+    success: true,
+    message: "Project updated successfully",
+    project: updatedProject,
+  });
+});
 
-    const updatedProject = await prisma.project.update({
-      where: {
-        id,
-      },
-      data: {
-        name,
-        description,
-        environment,
-      },
-    });
+// Delete Project
+export const deleteProject = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-    res.json({
-      success: true,
-      message: "Project updated successfully",
-      project: updatedProject,
-    });
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      ownerId: req.user.id,
+    },
+  });
 
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
-export const deleteProject = async (req, res) => {
-  try {
 
-    const { id } = req.params;
+  await prisma.project.delete({
+    where: {
+      id,
+    },
+  });
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        ownerId: req.user.id,
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
-
-    await prisma.project.delete({
-      where: {
-        id,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: "Project deleted successfully",
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
-};
+  res.json({
+    success: true,
+    message: "Project deleted successfully",
+  });
+});

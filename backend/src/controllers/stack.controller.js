@@ -1,247 +1,232 @@
 import prisma from "../config/prisma.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
 
 import { exec } from "child_process";
 import { promisify } from "util";
-
-
-
-const execAsync = promisify(exec);
-
 import fs from "fs/promises";
 import path from "path";
 
-export const createStack = async (req, res) => {
-  try {
-    const { projectId } = req.params;
-    const { stackName, composeFile } = req.body;
+const execAsync = promisify(exec);
 
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-    });
+// Create Stack
+export const createStack = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const { stackName, composeFile } = req.body;
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
 
-    // Temporary compose file
-    const filePath = path.join(process.cwd(), `${stackName}.yml`);
-
-    await fs.writeFile(filePath, composeFile);
-
-    await execAsync(`docker stack deploy -c "${filePath}" ${stackName}`);
-
-    await fs.unlink(filePath);
-
-    res.status(201).json({
-      success: true,
-      message: "Stack deployed successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
 
-export const listStacks = async (req, res) => {
-  try {
-    const { projectId } = req.params;
+  const filePath = path.join(process.cwd(), `${stackName}.yml`);
 
-    // Just verify the project exists
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-    });
+  await fs.writeFile(filePath, composeFile);
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+  await execAsync(`docker stack deploy -c "${filePath}" ${stackName}`);
 
-    const { stdout } = await execAsync("docker stack ls");
+  await fs.unlink(filePath);
 
-    const stacks = stdout
-      .trim()
-      .split("\n")
-      .slice(1)
-      .filter((line) => line.trim() !== "")
-      .map((line) => {
-        const parts = line.trim().split(/\s+/);
+  res.status(201).json({
+    success: true,
+    message: "Stack deployed successfully",
+  });
+});
 
-        return {
-          name: parts[0],
-          services: Number(parts[1]),
-          orchestrator: parts[2],
-        };
-      });
+// List Stacks
+export const listStacks = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
 
-    return res.status(200).json({
-      success: true,
-      count: stacks.length,
-      stacks,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
 
-export const getStack = async (req, res) => {
-  try {
-    const { stackName } = req.params;
+  const { stdout } = await execAsync("docker stack ls");
 
-    const { stdout } = await execAsync("docker stack ls");
+  const stacks = stdout
+    .trim()
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const parts = line.trim().split(/\s+/);
 
-    const stacks = stdout
-      .trim()
-      .split("\n")
-      .slice(1)
-      .filter((line) => line.trim() !== "")
-      .map((line) => {
-        const parts = line.trim().split(/\s+/);
-
-        return {
-          name: parts[0],
-          services: Number(parts[1]),
-          orchestrator: parts[2],
-        };
-      });
-
-    const stack = stacks.find((s) => s.name === stackName);
-
-    if (!stack) {
-      return res.status(404).json({
-        success: false,
-        message: "Stack not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      stack,
+      return {
+        name: parts[0],
+        services: Number(parts[1]),
+        orchestrator: parts[2],
+      };
     });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+
+  res.status(200).json({
+    success: true,
+    count: stacks.length,
+    stacks,
+  });
+});
+
+// Get Stack
+export const getStack = asyncHandler(async (req, res) => {
+  const { projectId, stackName } = req.params;
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
 
-export const deleteStack = async (req, res) => {
-  try {
-    const { stackName } = req.params;
+  const { stdout } = await execAsync("docker stack ls");
 
-    await execAsync(`docker stack rm ${stackName}`);
+  const stacks = stdout
+    .trim()
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const parts = line.trim().split(/\s+/);
 
-    res.status(200).json({
-      success: true,
-      message: "Stack deleted successfully",
+      return {
+        name: parts[0],
+        services: Number(parts[1]),
+        orchestrator: parts[2],
+      };
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+
+  const stack = stacks.find((s) => s.name === stackName);
+
+  if (!stack) {
+    throw new ApiError(404, "Stack not found");
   }
-};
 
-export const getStackServices = async (req, res) => {
-  try {
-    const { stackName } = req.params;
+  res.status(200).json({
+    success: true,
+    stack,
+  });
+});
 
-    const { stdout } = await execAsync(
-      `docker stack services ${stackName}`
-    );
+// Delete Stack
+export const deleteStack = asyncHandler(async (req, res) => {
+  const { projectId, stackName } = req.params;
 
-    const services = stdout
-      .trim()
-      .split("\n")
-      .slice(1)
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const parts = line.trim().split(/\s+/);
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
 
-        return {
-          id: parts[0],
-          name: parts[1],
-          mode: parts[2],
-          replicas: parts[3],
-          image: parts[4],
-          ports: parts.slice(5).join(" "),
-        };
-      });
-
-    res.status(200).json({
-      success: true,
-      count: services.length,
-      services,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
-export const getStackTasks = async (req, res) => {
-  try {
-    const { projectId, stackName } = req.params;
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        ownerId: req.user.id,
-      },
-    });
+  await execAsync(`docker stack rm ${stackName}`);
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+  res.status(200).json({
+    success: true,
+    message: "Stack deleted successfully",
+  });
+});
 
-    const { stdout } = await execAsync(`docker stack ps ${stackName}`);
+// Get Stack Services
+export const getStackServices = asyncHandler(async (req, res) => {
+  const { projectId, stackName } = req.params;
 
-    const tasks = stdout
-      .trim()
-      .split("\n")
-      .slice(1)
-      .filter((line) => line.trim() !== "")
-      .map((line) => {
-        const parts = line.trim().split(/\s+/);
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
 
-        return {
-          id: parts[0],
-          name: parts[1],
-          image: parts[3],
-          node: parts[4],
-          desiredState: parts[5],
-          currentState: parts.slice(6).join(" "),
-        };
-      });
-
-    return res.status(200).json({
-      success: true,
-      count: tasks.length,
-      tasks,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+  if (!project) {
+    throw new ApiError(404, "Project not found");
   }
-};
+
+  const { stdout } = await execAsync(
+    `docker stack services ${stackName}`
+  );
+
+  const services = stdout
+    .trim()
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const parts = line.trim().split(/\s+/);
+
+      return {
+        id: parts[0],
+        name: parts[1],
+        mode: parts[2],
+        replicas: parts[3],
+        image: parts[4],
+        ports: parts.slice(5).join(" "),
+      };
+    });
+
+  res.status(200).json({
+    success: true,
+    count: services.length,
+    services,
+  });
+});
+
+// Get Stack Tasks
+export const getStackTasks = asyncHandler(async (req, res) => {
+  const { projectId, stackName } = req.params;
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ownerId: req.user.id,
+    },
+  });
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
+  }
+
+  const { stdout } = await execAsync(`docker stack ps ${stackName}`);
+
+  const tasks = stdout
+    .trim()
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const parts = line.trim().split(/\s+/);
+
+      return {
+        id: parts[0],
+        name: parts[1],
+        image: parts[3],
+        node: parts[4],
+        desiredState: parts[5],
+        currentState: parts.slice(6).join(" "),
+      };
+    });
+
+  res.status(200).json({
+    success: true,
+    count: tasks.length,
+    tasks,
+  });
+});

@@ -1,213 +1,186 @@
 import prisma from "../config/prisma.js";
 import { createDockerClient } from "../services/docker.service.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
 
-export const getNetworks = async (req, res) => {
-    try {
-        const { dockerHostId } = req.params;
+// Get Networks
+export const getNetworks = asyncHandler(async (req, res) => {
+  const { dockerHostId } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const networks = await docker.listNetworks();
+  const networks = await docker.listNetworks();
 
-        res.json({
-            success: true,
-            count: networks.length,
-            networks
-        });
+  res.json({
+    success: true,
+    count: networks.length,
+    networks,
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const inspectNetwork = async (req, res) => {
-    try {
-        const { dockerHostId, networkId } = req.params;
+// Inspect Network
+export const inspectNetwork = asyncHandler(async (req, res) => {
+  const { dockerHostId, networkId } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const network = docker.getNetwork(networkId);
+  const network = docker.getNetwork(networkId);
 
-        const info = await network.inspect();
+  const info = await network.inspect();
 
-        res.status(200).json({
-            success: true,
-            network: info
-        });
+  res.status(200).json({
+    success: true,
+    network: info,
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const createNetwork = async (req, res) => {
-    try {
-        const { dockerHostId } = req.params;
-        const { name, driver = "bridge" } = req.body;
+// Create Network
+export const createNetwork = asyncHandler(async (req, res) => {
+  const { dockerHostId } = req.params;
+  const { name, driver = "bridge" } = req.body;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  if (!name) {
+    throw new ApiError(400, "Network name is required");
+  }
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        const docker = createDockerClient(dockerHost);
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const network = await docker.createNetwork({
-            Name: name,
-            Driver: driver
-        });
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        res.status(201).json({
-            success: true,
-            message: "Network created successfully",
-            network
-        });
+  const network = await docker.createNetwork({
+    Name: name,
+    Driver: driver,
+  });
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const deleteNetwork = async (req, res) => {
-    try {
-        const { dockerHostId, networkId } = req.params;
+  res.status(201).json({
+    success: true,
+    message: "Network created successfully",
+    network,
+  });
+});
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: {
-                id: dockerHostId
-            }
-        });
+// Delete Network
+export const deleteNetwork = asyncHandler(async (req, res) => {
+  const { dockerHostId, networkId } = req.params;
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        const docker = createDockerClient(dockerHost);
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const network = docker.getNetwork(networkId);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        await network.remove();
+  const network = docker.getNetwork(networkId);
 
-        res.json({
-            success: true,
-            message: "Network deleted successfully"
-        });
+  await network.remove();
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const connectContainer = async (req, res) => {
-    try {
-        const { dockerHostId, networkId } = req.params;
-        const { containerId } = req.body;
+  res.json({
+    success: true,
+    message: "Network deleted successfully",
+  });
+});
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+// Connect Container
+export const connectContainer = asyncHandler(async (req, res) => {
+  const { dockerHostId, networkId } = req.params;
+  const { containerId } = req.body;
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!containerId) {
+    throw new ApiError(400, "Container ID is required");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        const network = docker.getNetwork(networkId);
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        await network.connect({
-            Container: containerId
-        });
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        res.status(201).json({
-            success: true,
-            message: "Container connected successfully"
-        });
+  const network = docker.getNetwork(networkId);
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const disconnectContainer = async (req, res) => {
-    try {
-        const { dockerHostId, networkId } = req.params;
-        const { containerId } = req.body;
+  await network.connect({
+    Container: containerId,
+  });
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: {
-                id: dockerHostId
-            }
-        });
+  res.status(200).json({
+    success: true,
+    message: "Container connected successfully",
+  });
+});
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+// Disconnect Container
+export const disconnectContainer = asyncHandler(async (req, res) => {
+  const { dockerHostId, networkId } = req.params;
+  const { containerId } = req.body;
 
-        const docker = createDockerClient(dockerHost);
+  if (!containerId) {
+    throw new ApiError(400, "Container ID is required");
+  }
 
-        const network = docker.getNetwork(networkId);
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        await network.disconnect({
-            Container: containerId
-        });
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        res.json({
-            success: true,
-            message: "Container disconnected successfully"
-        });
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
+  const network = docker.getNetwork(networkId);
+
+  await network.disconnect({
+    Container: containerId,
+  });
+
+  res.json({
+    success: true,
+    message: "Container disconnected successfully",
+  });
+});

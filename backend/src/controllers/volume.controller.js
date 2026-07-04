@@ -1,172 +1,144 @@
 import prisma from "../config/prisma.js";
 import { createDockerClient } from "../services/docker.service.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
 
-export const getVolumes = async (req, res) => {
-    try {
-        const { dockerHostId } = req.params;
+// Get Volumes
+export const getVolumes = asyncHandler(async (req, res) => {
+  const { dockerHostId } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const result = await docker.listVolumes();
+  const result = await docker.listVolumes();
 
-        res.status(200).json({
-            success: true,
-            count: result.Volumes?.length || 0,
-            volumes: result.Volumes || []
-        });
+  res.status(200).json({
+    success: true,
+    count: result.Volumes?.length || 0,
+    volumes: result.Volumes || [],
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
+// Create Volume
+export const createVolume = asyncHandler(async (req, res) => {
+  const { dockerHostId } = req.params;
+  const { name } = req.body;
 
-export const createVolume = async (req, res) => {
-    try {
-        const { dockerHostId } = req.params;
-        const { name } = req.body;
+  if (!name) {
+    throw new ApiError(400, "Volume name is required");
+  }
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const volume = await docker.createVolume({
-            Name: name
-        });
+  const volume = await docker.createVolume({
+    Name: name,
+  });
 
-        res.status(201).json({
-            success: true,
-            message: "Volume created successfully",
-            volume
-        });
+  res.status(201).json({
+    success: true,
+    message: "Volume created successfully",
+    volume,
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const inspectVolume = async (req, res) => {
-    try {
-        const { dockerHostId, volumeName } = req.params;
+// Inspect Volume
+export const inspectVolume = asyncHandler(async (req, res) => {
+  const { dockerHostId, volumeName } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const volume = docker.getVolume(volumeName);
+  const volume = docker.getVolume(volumeName);
 
-        const details = await volume.inspect();
+  const details = await volume.inspect();
 
-        res.status(200).json({
-            success: true,
-            volume: details
-        });
+  res.status(200).json({
+    success: true,
+    volume: details,
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const deleteVolume = async (req, res) => {
-    try {
-        const { dockerHostId, volumeName } = req.params;
+// Delete Volume
+export const deleteVolume = asyncHandler(async (req, res) => {
+  const { dockerHostId, volumeName } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: { id: dockerHostId }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const volume = docker.getVolume(volumeName);
+  const volume = docker.getVolume(volumeName);
 
-        await volume.remove();
+  await volume.remove();
 
-        res.status(200).json({
-            success: true,
-            message: "Volume deleted successfully"
-        });
+  res.status(200).json({
+    success: true,
+    message: "Volume deleted successfully",
+  });
+});
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-export const pruneVolumes = async (req, res) => {
-    try {
-        const { dockerHostId } = req.params;
+// Prune Volumes
+export const pruneVolumes = asyncHandler(async (req, res) => {
+  const { dockerHostId } = req.params;
 
-        const dockerHost = await prisma.dockerHost.findUnique({
-            where: {
-                id: dockerHostId
-            }
-        });
+  const dockerHost = await prisma.dockerHost.findUnique({
+    where: { id: dockerHostId },
+  });
 
-        if (!dockerHost) {
-            return res.status(404).json({
-                success: false,
-                message: "Docker host not found"
-            });
-        }
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker host not found");
+  }
 
-        const docker = createDockerClient(dockerHost);
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-        const result = await docker.pruneVolumes();
+  const result = await docker.pruneVolumes();
 
-        res.status(200).json({
-            success: true,
-            message: "Unused volumes pruned successfully",
-            reclaimedSpace: result.SpaceReclaimed,
-            volumesDeleted: result.VolumesDeleted || []
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
+  res.status(200).json({
+    success: true,
+    message: "Unused volumes pruned successfully",
+    reclaimedSpace: result.SpaceReclaimed,
+    volumesDeleted: result.VolumesDeleted || [],
+  });
+});

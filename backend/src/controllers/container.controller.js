@@ -1,80 +1,66 @@
 import prisma from "../config/prisma.js";
 import { createDockerClient } from "../services/docker.service.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+export const getContainers = asyncHandler(async (req, res) => {
 
-export const getContainers = async (req, res) => {
-  try {
     const { dockerHostId } = req.params;
 
     const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
+        where: {
+            id: dockerHostId,
+            project: {
+                ownerId: req.user.id,
+            },
         },
-      },
     });
 
     if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
+        throw new ApiError(404, "Docker Host not found");
     }
 
     const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
+        dockerHost.host,
+        dockerHost.port
     );
 
     const containers = await docker.listContainers({ all: true });
 
     const result = containers.map((container) => ({
-      id: container.Id,
-      name: container.Names[0].replace("/", ""),
-      image: container.Image,
-      status: container.State,
-      ports: container.Ports,
+        id: container.Id,
+        name: container.Names[0].replace("/", ""),
+        image: container.Image,
+        status: container.State,
+        ports: container.Ports,
     }));
 
     res.json({
-      success: true,
-      count: result.length,
-      containers: result,
+        success: true,
+        count: result.length,
+        containers: result,
     });
 
-  } catch (error) {
+});
+export const startContainer = asyncHandler(async (req, res) => {
 
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
-};
-
-export const startContainer = async (req, res) => {
-  try {
     const { dockerHostId, containerId } = req.params;
 
     const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
+        where: {
+            id: dockerHostId,
+            project: {
+                ownerId: req.user.id,
+            },
         },
-      },
     });
 
     if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
+        throw new ApiError(404, "Docker Host not found");
     }
 
     const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
+        dockerHost.host,
+        dockerHost.port
     );
 
     const container = docker.getContainer(containerId);
@@ -82,203 +68,142 @@ export const startContainer = async (req, res) => {
     await container.start();
 
     res.json({
-      success: true,
-      message: "Container started successfully",
+        success: true,
+        message: "Container started successfully",
     });
 
-  } catch (error) {
-  console.error(error);
+});
 
-  res.status(500).json({
-    success: false,
-    message: error.message,
-    stack: error.stack,
+export const stopContainer = asyncHandler(async (req, res) => {
+  const { dockerHostId, containerId } = req.params;
+
+  const dockerHost = await prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      project: {
+        ownerId: req.user.id,
+      },
+    },
   });
-}
-};
 
-export const stopContainer = async (req, res) => {
-  try {
-    const { dockerHostId, containerId } = req.params;
-
-    const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
-        },
-      },
-    });
-
-    if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
-    }
-
-    const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
-    );
-
-    const container = docker.getContainer(containerId);
-
-    await container.stop();
-
-    res.json({
-      success: true,
-      message: "Container stopped successfully",
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker Host not found");
   }
-};
 
-export const restartContainer = async (req, res) => {
-  try {
-    const { dockerHostId, containerId } = req.params;
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-    const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
-        },
+  const container = docker.getContainer(containerId);
+
+  await container.stop();
+
+  res.json({
+    success: true,
+    message: "Container stopped successfully",
+  });
+});
+export const restartContainer = asyncHandler(async (req, res) => {
+  const { dockerHostId, containerId } = req.params;
+
+  const dockerHost = await prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      project: {
+        ownerId: req.user.id,
       },
-    });
+    },
+  });
 
-    if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
-    }
-
-    const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
-    );
-
-    const container = docker.getContainer(containerId);
-
-    await container.restart();
-
-    res.json({
-      success: true,
-      message: "Container restarted successfully",
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker Host not found");
   }
-};
-export const deleteContainer = async (req, res) => {
-  try {
-    const { dockerHostId, containerId } = req.params;
 
-    const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
-        },
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
+
+  const container = docker.getContainer(containerId);
+
+  await container.restart();
+
+  res.json({
+    success: true,
+    message: "Container restarted successfully",
+  });
+});
+export const deleteContainer = asyncHandler(async (req, res) => {
+  const { dockerHostId, containerId } = req.params;
+
+  const dockerHost = await prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      project: {
+        ownerId: req.user.id,
       },
-    });
+    },
+  });
 
-    if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
-    }
-
-    const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
-    );
-
-    const container = docker.getContainer(containerId);
-
-    await container.remove({
-      force: true,
-    });
-
-    res.json({
-      success: true,
-      message: "Container deleted successfully",
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker Host not found");
   }
-};
 
-export const getContainerLogs = async (req, res) => {
-  try {
-    const { dockerHostId, containerId } = req.params;
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
 
-    const dockerHost = await prisma.dockerHost.findFirst({
-      where: {
-        id: dockerHostId,
-        project: {
-          ownerId: req.user.id,
-        },
+  const container = docker.getContainer(containerId);
+
+  await container.remove({
+    force: true,
+  });
+
+  res.json({
+    success: true,
+    message: "Container deleted successfully",
+  });
+});
+
+export const getContainerLogs = asyncHandler(async (req, res) => {
+  const { dockerHostId, containerId } = req.params;
+
+  const dockerHost = await prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      project: {
+        ownerId: req.user.id,
       },
-    });
+    },
+  });
 
-    if (!dockerHost) {
-      return res.status(404).json({
-        success: false,
-        message: "Docker Host not found",
-      });
-    }
-
-    const docker = createDockerClient(
-      dockerHost.host,
-      dockerHost.port
-    );
-
-    const container = docker.getContainer(containerId);
-
-    const logs = await container.logs({
-      stdout: true,
-      stderr: true,
-      timestamps: true,
-    });
-
-    res.json({
-      success: true,
-      logs: logs.toString(),
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
+  if (!dockerHost) {
+    throw new ApiError(404, "Docker Host not found");
   }
-};
-export const getContainerStats = async (req, res) => {
-  try {
+
+  const docker = createDockerClient(
+    dockerHost.host,
+    dockerHost.port
+  );
+
+  const container = docker.getContainer(containerId);
+
+  const logs = await container.logs({
+    stdout: true,
+    stderr: true,
+    timestamps: true,
+  });
+
+  res.json({
+    success: true,
+    logs: logs.toString(),
+  });
+});
+
+export const getContainerStats = asyncHandler(async (req, res) => {
+  
     const { dockerHostId, containerId } = req.params;
 
     const dockerHost = await prisma.dockerHost.findFirst({
@@ -358,18 +283,10 @@ res.json({
     pids: stats.pids_stats?.current || 0,
   },
 });
-  } catch (error) {
+});
 
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
-};
-
-export const createContainer = async (req, res) => {
-  try {
+export const createContainer = asyncHandler(async (req, res) => {
+  
     const { dockerHostId } = req.params;
 
     const {
@@ -440,13 +357,4 @@ export const createContainer = async (req, res) => {
       message: "Container created successfully",
       id: container.id,
     });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
-};
+});
