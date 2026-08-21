@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { register, login } from "../controllers/auth.controller.js";
+import { register, login, me } from "../controllers/auth.controller.js";
+import { authenticate } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import {
   registerSchema,
@@ -93,11 +94,13 @@ router.post(
  *         description: Invalid credentials
  */
 
-router.post("/login", login);
+
 router.post(
   "/login",
   validate(loginSchema),
   login
 );
+
+router.get("/me", authenticate, me);
 
 export default router;

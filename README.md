@@ -160,6 +160,38 @@ Start the development server
 npm run dev
 ```
 
+## Docker Deployment
+
+Copy `.env.example` to `.env`, replace the database password and JWT secret, then start the production-like stack:
+
+```powershell
+docker compose up --build -d
+```
+
+The frontend is available at `http://localhost:8080`, and the backend health check is available at `http://localhost:5000/health`. Prisma migrations run automatically before the backend starts.
+
+To create a PostgreSQL backup on Windows PowerShell:
+
+```powershell
+.\scripts\backup-db.ps1
+```
+
+Run the local service check manually or from Task Scheduler:
+
+```powershell
+.\scripts\check-health.ps1
+```
+
+Store backups in separate durable storage. For production, terminate TLS at a reverse proxy, restrict `CORS_ORIGIN` to the real frontend origin, use a strong secret manager-backed `JWT_SECRET`, and schedule backups with retention and restore testing.
+
+For a public deployment with DNS already pointing to the host, use the optional Caddy HTTPS profile. Set `DOMAIN` and update `CORS_ORIGIN` to `https://<your-domain>` first:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+```
+
+Caddy obtains and renews certificates automatically. Ports `80` and `443` must be available and reachable from the internet.
+
 ---
 
 ## API Documentation

@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { requireProjectAccess } from "../middleware/authorization.middleware.js";
 import {
   createProject,
   getProjects,
+  getProjectMembers,
+  addProjectMember,
+  removeProjectMember,
   getProjectById,
   updateProject,
   deleteProject,
@@ -90,7 +94,11 @@ router.get("/", authenticate, getProjects);
  *       404:
  *         description: Project not found
  */
-router.get("/:id", authenticate, getProjectById);
+router.get("/:id", authenticate, requireProjectAccess("id"), getProjectById);
+
+router.get("/:id/members", authenticate, requireProjectAccess("id"), getProjectMembers);
+router.post("/:id/members", authenticate, requireProjectAccess("id"), addProjectMember);
+router.delete("/:id/members/:userId", authenticate, requireProjectAccess("id"), removeProjectMember);
 
 /**
  * @swagger
@@ -127,7 +135,7 @@ router.get("/:id", authenticate, getProjectById);
  *       404:
  *         description: Project not found
  */
-router.put("/:id", authenticate, updateProject);
+router.put("/:id", authenticate, requireProjectAccess("id"), updateProject);
 
 /**
  * @swagger
@@ -151,6 +159,6 @@ router.put("/:id", authenticate, updateProject);
  *       404:
  *         description: Project not found
  */
-router.delete("/:id", authenticate, deleteProject);
+router.delete("/:id", authenticate, requireProjectAccess("id"), deleteProject);
 
 export default router;

@@ -6,6 +6,9 @@ dist/
 
 coverage/
 
+backups/
+backups-final/
+
 .vscode/
 
 .idea/

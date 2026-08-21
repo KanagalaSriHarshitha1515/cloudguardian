@@ -10,6 +10,7 @@ import {
 } from "../controllers/stack.controller.js";
 
 import { authenticate } from "../middleware/auth.middleware.js";
+import { requireProjectAccess } from "../middleware/authorization.middleware.js";
 
 const router = express.Router();
 
@@ -53,7 +54,7 @@ router.use(authenticate);
  *       201:
  *         description: Stack deployed successfully
  */
-router.post("/:projectId", createStack);
+router.post("/:projectId", requireProjectAccess("projectId"), createStack);
 
 /**
  * @swagger
@@ -74,7 +75,7 @@ router.post("/:projectId", createStack);
  *       200:
  *         description: List of Docker stacks
  */
-router.get("/:projectId", listStacks);
+router.get("/:projectId", requireProjectAccess("projectId"), listStacks);
 
 /**
  * @swagger
@@ -100,7 +101,7 @@ router.get("/:projectId", listStacks);
  *       200:
  *         description: Stack details
  */
-router.get("/:projectId/:stackName", getStack);
+router.get("/:projectId/:stackName", requireProjectAccess("projectId"), getStack);
 
 /**
  * @swagger
@@ -122,7 +123,7 @@ router.get("/:projectId/:stackName", getStack);
  *       200:
  *         description: Stack deleted successfully
  */
-router.delete("/:projectId/:stackName", deleteStack);
+router.delete("/:projectId/:stackName", requireProjectAccess("projectId"), deleteStack);
 
 /**
  * @swagger
@@ -144,7 +145,7 @@ router.delete("/:projectId/:stackName", deleteStack);
  *       200:
  *         description: Stack services
  */
-router.get("/:projectId/:stackName/services", getStackServices);
+router.get("/:projectId/:stackName/services", requireProjectAccess("projectId"), getStackServices);
 
 /**
  * @swagger
@@ -166,6 +167,6 @@ router.get("/:projectId/:stackName/services", getStackServices);
  *       200:
  *         description: Stack tasks
  */
-router.get("/:projectId/:stackName/tasks", getStackTasks);
+router.get("/:projectId/:stackName/tasks", requireProjectAccess("projectId"), getStackTasks);
 
 export default router;

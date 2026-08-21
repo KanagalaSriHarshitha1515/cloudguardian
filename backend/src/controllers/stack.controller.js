@@ -1,13 +1,15 @@
 import prisma from "../config/prisma.js";
+import { projectAccessFilter } from "../middleware/authorization.middleware.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // Create Stack
 export const createStack = asyncHandler(async (req, res) => {
@@ -17,7 +19,7 @@ export const createStack = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -25,11 +27,12 @@ export const createStack = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const filePath = path.join(process.cwd(), `${stackName}.yml`);
+  const safeStackName = stackName.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const filePath = path.join(os.tmpdir(), `${safeStackName}-${Date.now()}.yml`);
 
-  await fs.writeFile(filePath, composeFile);
+  await fs.writeFile(filePath, composeFile, "utf8");
 
-  await execAsync(`docker stack deploy -c "${filePath}" ${stackName}`);
+  await execFileAsync("docker", ["stack", "deploy", "-c", filePath, safeStackName]);
 
   await fs.unlink(filePath);
 
@@ -46,7 +49,7 @@ export const listStacks = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -54,7 +57,7 @@ export const listStacks = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const { stdout } = await execAsync("docker stack ls");
+  const { stdout } = await execFileAsync("docker", ["stack", "ls"]);
 
   const stacks = stdout
     .trim()
@@ -85,7 +88,7 @@ export const getStack = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -93,7 +96,7 @@ export const getStack = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const { stdout } = await execAsync("docker stack ls");
+  const { stdout } = await execFileAsync("docker", ["stack", "ls"]);
 
   const stacks = stdout
     .trim()
@@ -129,7 +132,7 @@ export const deleteStack = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -137,7 +140,7 @@ export const deleteStack = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  await execAsync(`docker stack rm ${stackName}`);
+  await execFileAsync("docker", ["stack", "rm", stackName]);
 
   res.status(200).json({
     success: true,
@@ -152,7 +155,7 @@ export const getStackServices = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -160,9 +163,7 @@ export const getStackServices = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const { stdout } = await execAsync(
-    `docker stack services ${stackName}`
-  );
+  const { stdout } = await execFileAsync("docker", ["stack", "services", stackName]);
 
   const services = stdout
     .trim()
@@ -196,7 +197,7 @@ export const getStackTasks = asyncHandler(async (req, res) => {
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      ownerId: req.user.id,
+      ...projectAccessFilter(req.user.id),
     },
   });
 
@@ -204,7 +205,7 @@ export const getStackTasks = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const { stdout } = await execAsync(`docker stack ps ${stackName}`);
+  const { stdout } = await execFileAsync("docker", ["stack", "ps", stackName]);
 
   const tasks = stdout
     .trim()

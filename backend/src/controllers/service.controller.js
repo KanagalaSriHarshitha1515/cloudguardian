@@ -1,28 +1,37 @@
 import prisma from "../config/prisma.js";
+import { projectAccessFilter } from "../middleware/authorization.middleware.js";
 import { createDockerClient } from "../services/docker.service.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+
+const getAuthorizedProject = async (projectId, userId) => {
+  return prisma.project.findFirst({
+    where: {
+      id: projectId,
+      ...projectAccessFilter(userId),
+    },
+    include: {
+      dockerHosts: true,
+    },
+  });
+};
+
+const resolveProjectAndHost = async (projectId, userId) => {
+  const project = await getAuthorizedProject(projectId, userId);
+  if (!project) {
+    throw new ApiError(404, "Project not found");
+  }
+  if (!project.dockerHosts.length) {
+    throw new ApiError(404, "No Docker Host attached to this project");
+  }
+  return project.dockerHosts[0];
+};
 
 // List Services
 export const listServices = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      dockerHosts: true,
-    },
-  });
-
-  if (!project) {
-    throw new ApiError(404, "Project not found");
-  }
-
-  if (!project.dockerHosts.length) {
-    throw new ApiError(404, "No Docker Host attached to this project");
-  }
-
-  const dockerHost = project.dockerHosts[0];
+  const dockerHost = await resolveProjectAndHost(projectId, req.user.id);
 
   const docker = createDockerClient(
     dockerHost.host,
@@ -42,22 +51,7 @@ export const listServices = asyncHandler(async (req, res) => {
 export const getService = asyncHandler(async (req, res) => {
   const { projectId, serviceId } = req.params;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      dockerHosts: true,
-    },
-  });
-
-  if (!project) {
-    throw new ApiError(404, "Project not found");
-  }
-
-  if (!project.dockerHosts.length) {
-    throw new ApiError(404, "No Docker Host attached to this project");
-  }
-
-  const dockerHost = project.dockerHosts[0];
+  const dockerHost = await resolveProjectAndHost(projectId, req.user.id);
 
   const docker = createDockerClient(
     dockerHost.host,
@@ -79,37 +73,22 @@ export const createService = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
 
   const {
-    name,
+    serviceName,
     image,
     replicas,
     publishedPort,
     targetPort,
   } = req.body;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      dockerHosts: true,
-    },
-  });
-
-  if (!project) {
-    throw new ApiError(404, "Project not found");
-  }
-
-  if (!project.dockerHosts.length) {
-    throw new ApiError(404, "No Docker Host attached");
-  }
-
-  const dockerHost = project.dockerHosts[0];
+  const dockerHost = await resolveProjectAndHost(projectId, req.user.id);
 
   const docker = createDockerClient(
     dockerHost.host,
     dockerHost.port
   );
 
-  const service = await docker.createService({
-    Name: name,
+  const serviceSpec = {
+    Name: serviceName,
 
     TaskTemplate: {
       ContainerSpec: {
@@ -122,8 +101,10 @@ export const createService = asyncHandler(async (req, res) => {
         Replicas: replicas || 1,
       },
     },
+  };
 
-    EndpointSpec: {
+  if (publishedPort && targetPort) {
+    serviceSpec.EndpointSpec = {
       Ports: [
         {
           Protocol: "tcp",
@@ -131,8 +112,10 @@ export const createService = asyncHandler(async (req, res) => {
           TargetPort: targetPort,
         },
       ],
-    },
-  });
+    };
+  }
+
+  const service = await docker.createService(serviceSpec);
 
   res.status(201).json({
     success: true,
@@ -146,22 +129,7 @@ export const scaleService = asyncHandler(async (req, res) => {
   const { projectId, serviceId } = req.params;
   const { replicas } = req.body;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      dockerHosts: true,
-    },
-  });
-
-  if (!project) {
-    throw new ApiError(404, "Project not found");
-  }
-
-  if (!project.dockerHosts.length) {
-    throw new ApiError(404, "No Docker Host attached");
-  }
-
-  const dockerHost = project.dockerHosts[0];
+  const dockerHost = await resolveProjectAndHost(projectId, req.user.id);
 
   const docker = createDockerClient(
     dockerHost.host,
@@ -189,22 +157,7 @@ export const scaleService = asyncHandler(async (req, res) => {
 export const deleteService = asyncHandler(async (req, res) => {
   const { projectId, serviceId } = req.params;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      dockerHosts: true,
-    },
-  });
-
-  if (!project) {
-    throw new ApiError(404, "Project not found");
-  }
-
-  if (!project.dockerHosts.length) {
-    throw new ApiError(404, "No Docker Host attached");
-  }
-
-  const dockerHost = project.dockerHosts[0];
+  const dockerHost = await resolveProjectAndHost(projectId, req.user.id);
 
   const docker = createDockerClient(
     dockerHost.host,

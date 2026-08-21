@@ -8,7 +8,10 @@ datasource db {
 }
 
 enum UserRole {
+  OWNER
   ADMIN
+  MEMBER
+  VIEWER
   USER
 }
 
@@ -44,10 +47,13 @@ model User {
   password  String
   role      UserRole  @default(USER)
 
-  projects  Project[]
+  ownedProjects      Project[]      @relation("OwnedProjects")
+  ownedTeams         Team[]         @relation("OwnedTeams")
+  teamMemberships    TeamMember[]   @relation("TeamMemberships")
+  projectMemberships ProjectMember[] @relation("ProjectMemberships")
 
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 model Project {
@@ -57,12 +63,50 @@ model Project {
   environment String   @default("Development")
 
   ownerId String
-  owner   User @relation(fields: [ownerId], references: [id])
+  owner   User @relation("OwnedProjects", fields: [ownerId], references: [id])
+
+  teamId String?
+  team   Team? @relation("TeamProjects", fields: [teamId], references: [id], onDelete: SetNull)
+  projectMembers ProjectMember[]
 
   dockerHosts DockerHost[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User         @relation("OwnedTeams", fields: [ownerId], references: [id])
+
+  projects    Project[]    @relation("TeamProjects")
+  members     TeamMember[] @relation("TeamMembers")
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  team      Team     @relation("TeamMembers", fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
 }
 
 model DockerHost {

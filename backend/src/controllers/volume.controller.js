@@ -1,15 +1,23 @@
 import prisma from "../config/prisma.js";
+import { dockerHostAccessFilter } from "../middleware/authorization.middleware.js";
 import { createDockerClient } from "../services/docker.service.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+
+const getOwnedDockerHost = async (dockerHostId, userId) => {
+  return prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      ...dockerHostAccessFilter(userId),
+    },
+  });
+};
 
 // Get Volumes
 export const getVolumes = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -38,9 +46,7 @@ export const createVolume = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Volume name is required");
   }
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -66,9 +72,7 @@ export const createVolume = asyncHandler(async (req, res) => {
 export const inspectVolume = asyncHandler(async (req, res) => {
   const { dockerHostId, volumeName } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -93,9 +97,7 @@ export const inspectVolume = asyncHandler(async (req, res) => {
 export const deleteVolume = asyncHandler(async (req, res) => {
   const { dockerHostId, volumeName } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -120,9 +122,7 @@ export const deleteVolume = asyncHandler(async (req, res) => {
 export const pruneVolumes = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");

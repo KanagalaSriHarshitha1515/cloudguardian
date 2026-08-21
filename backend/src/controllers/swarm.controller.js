@@ -1,15 +1,23 @@
 import prisma from "../config/prisma.js";
+import { dockerHostAccessFilter } from "../middleware/authorization.middleware.js";
 import { createDockerClient } from "../services/docker.service.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+
+const getOwnedDockerHost = async (dockerHostId, userId) => {
+  return prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      ...dockerHostAccessFilter(userId),
+    },
+  });
+};
 
 // Initialize Swarm
 export const initializeSwarm = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -36,9 +44,7 @@ export const initializeSwarm = asyncHandler(async (req, res) => {
 export const inspectSwarm = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -61,9 +67,7 @@ export const inspectSwarm = asyncHandler(async (req, res) => {
 export const leaveSwarm = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");
@@ -88,9 +92,7 @@ export const leaveSwarm = asyncHandler(async (req, res) => {
 export const listSwarmNodes = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findUnique({
-    where: { id: dockerHostId },
-  });
+  const dockerHost = await getOwnedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker host not found");

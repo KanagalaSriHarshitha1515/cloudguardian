@@ -7,6 +7,7 @@ import {
   deleteService,
 } from "../controllers/service.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { requireProjectAccess } from "../middleware/authorization.middleware.js";
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.use(authenticate);
  *       404:
  *         description: Project not found
  */
-router.get("/:projectId", listServices);
+router.get("/:projectId", requireProjectAccess("projectId"), listServices);
 
 /**
  * @swagger
@@ -71,7 +72,7 @@ router.get("/:projectId", listServices);
  *       404:
  *         description: Service not found
  */
-router.get("/:projectId/:serviceId", getService);
+router.get("/:projectId/:serviceId", requireProjectAccess("projectId"), getService);
 
 /**
  * @swagger
@@ -115,7 +116,7 @@ router.get("/:projectId/:serviceId", getService);
  *       400:
  *         description: Invalid request
  */
-router.post("/:projectId", createService);
+router.post("/:projectId", requireProjectAccess("projectId"), createService);
 
 /**
  * @swagger
@@ -153,7 +154,7 @@ router.post("/:projectId", createService);
  *         description: Service not found
  */
 
-router.patch("/:projectId/:serviceId/scale", scaleService);
+router.patch("/:projectId/:serviceId/scale", requireProjectAccess("projectId"), scaleService);
 
 
 /**
@@ -179,6 +180,6 @@ router.patch("/:projectId/:serviceId/scale", scaleService);
  *       404:
  *         description: Service not found
  */
-router.delete("/:projectId/:serviceId", deleteService);
+router.delete("/:projectId/:serviceId", requireProjectAccess("projectId"), deleteService);
 
 export default router;

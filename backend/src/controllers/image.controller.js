@@ -1,30 +1,29 @@
 import prisma from "../config/prisma.js";
+import { dockerHostAccessFilter } from "../middleware/authorization.middleware.js";
 import { createDockerClient } from "../services/docker.service.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+
+const getAuthorizedDockerHost = async (dockerHostId, userId) => {
+  return prisma.dockerHost.findFirst({
+    where: {
+      id: dockerHostId,
+      ...dockerHostAccessFilter(userId),
+    },
+  });
+};
 
 // Get Images
 export const getImages = asyncHandler(async (req, res) => {
   const { dockerHostId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findFirst({
-    where: {
-      id: dockerHostId,
-      project: {
-        ownerId: req.user.id,
-      },
-    },
-  });
+  const dockerHost = await getAuthorizedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker Host not found");
   }
 
-  const docker = createDockerClient(
-    dockerHost.host,
-    dockerHost.port
-  );
-
+  const docker = createDockerClient(dockerHost.host, dockerHost.port);
   const images = await docker.listImages();
 
   const formattedImages = images.map((image) => ({
@@ -50,23 +49,13 @@ export const pullImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Image name is required");
   }
 
-  const dockerHost = await prisma.dockerHost.findFirst({
-    where: {
-      id: dockerHostId,
-      project: {
-        ownerId: req.user.id,
-      },
-    },
-  });
+  const dockerHost = await getAuthorizedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker Host not found");
   }
 
-  const docker = createDockerClient(
-    dockerHost.host,
-    dockerHost.port
-  );
+  const docker = createDockerClient(dockerHost.host, dockerHost.port);
 
   await new Promise((resolve, reject) => {
     docker.pull(image, (err, stream) => {
@@ -89,24 +78,13 @@ export const pullImage = asyncHandler(async (req, res) => {
 export const deleteImage = asyncHandler(async (req, res) => {
   const { dockerHostId, imageId } = req.params;
 
-  const dockerHost = await prisma.dockerHost.findFirst({
-    where: {
-      id: dockerHostId,
-      project: {
-        ownerId: req.user.id,
-      },
-    },
-  });
+  const dockerHost = await getAuthorizedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker Host not found");
   }
 
-  const docker = createDockerClient(
-    dockerHost.host,
-    dockerHost.port
-  );
-
+  const docker = createDockerClient(dockerHost.host, dockerHost.port);
   await docker.getImage(imageId).remove();
 
   res.json({
@@ -124,24 +102,13 @@ export const tagImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Repository name is required");
   }
 
-  const dockerHost = await prisma.dockerHost.findFirst({
-    where: {
-      id: dockerHostId,
-      project: {
-        ownerId: req.user.id,
-      },
-    },
-  });
+  const dockerHost = await getAuthorizedDockerHost(dockerHostId, req.user.id);
 
   if (!dockerHost) {
     throw new ApiError(404, "Docker Host not found");
   }
 
-  const docker = createDockerClient(
-    dockerHost.host,
-    dockerHost.port
-  );
-
+  const docker = createDockerClient(dockerHost.host, dockerHost.port);
   const image = docker.getImage(imageId);
 
   await image.tag({
